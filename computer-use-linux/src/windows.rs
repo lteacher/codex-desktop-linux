@@ -11,7 +11,7 @@ pub const GNOME_SHELL_INTROSPECT_BACKEND: &str = "gnome-shell-introspect";
 pub const GNOME_SHELL_EXTENSION_BACKEND: &str = "gnome-shell-extension";
 pub const GNOME_SHELL_EXTENSION_SERVICE: &str = "com.openai.Codex.WindowControl";
 pub const GNOME_SHELL_EXTENSION_OBJECT_PATH: &str = "/com/openai/Codex/WindowControl";
-pub const WINDOW_PERMISSION_HINT: &str = "Computer Use could not access a GNOME window list backend. Targeted window input requires session-bus access plus either GNOME Shell Introspect permission or the Codex GNOME Shell extension backend. Run setup_window_targeting to install the extension backend.";
+pub const WINDOW_PERMISSION_HINT: &str = "Computer Use could not access a window list backend. On GNOME, targeted window input requires session-bus access plus either GNOME Shell Introspect permission or the Codex GNOME Shell extension backend (run setup_window_targeting to install it). On KDE Plasma, window listing is not yet supported.";
 const FOCUS_VERIFY_ATTEMPTS: usize = 6;
 const FOCUS_VERIFY_DELAY: Duration = Duration::from_millis(50);
 
