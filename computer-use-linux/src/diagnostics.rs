@@ -64,6 +64,7 @@ pub struct AccessibilityReport {
 pub struct WindowingReport {
     pub gnome_shell_introspect: Check,
     pub codex_gnome_shell_extension: Check,
+    pub plasma_window_management: Check,
     pub can_list_windows: bool,
     pub can_focus_apps: bool,
     pub can_focus_windows: bool,
@@ -385,7 +386,14 @@ fn windowing_report() -> WindowingReport {
         "com.openai.Codex.WindowControl.ListWindows",
         &[],
     );
-    let can_list_windows = gnome_shell_introspect.ok || codex_gnome_shell_extension.ok;
+    let plasma_window_management = if is_kde() {
+        check_plasma_window_management()
+    } else {
+        Check::fail("Not a KDE Plasma session")
+    };
+    let can_list_windows = gnome_shell_introspect.ok
+        || codex_gnome_shell_extension.ok
+        || plasma_window_management.ok;
     let can_focus_apps = gdbus_introspect_contains(
         "org.gnome.Shell",
         "/org/gnome/Shell",
@@ -394,8 +402,10 @@ fn windowing_report() -> WindowingReport {
     )
     .ok;
     let can_focus_windows = codex_gnome_shell_extension.ok;
-    let note = if is_kde() {
-        "KDE Plasma window listing is not yet supported. Computer Use can use screenshots, AT-SPI tree inspection, and global ydotool input. Targeted window focus is unavailable."
+    let note = if is_kde() && can_list_windows {
+        "KDE Plasma window listing is available via KWin scripting (org.kde.kwin.Scripting)."
+    } else if is_kde() {
+        "KDE Plasma window listing is unavailable. Computer Use can use screenshots, AT-SPI tree inspection, and global ydotool input. Ensure KWin is running and org.kde.KWin is on the session bus."
     } else if can_list_windows {
         "A GNOME window listing backend is available for list_windows, focused_window, and targeted input verification."
     } else {
@@ -406,10 +416,18 @@ fn windowing_report() -> WindowingReport {
     WindowingReport {
         gnome_shell_introspect,
         codex_gnome_shell_extension,
+        plasma_window_management,
         can_list_windows,
         can_focus_apps,
         can_focus_windows,
         note,
+    }
+}
+
+fn check_plasma_window_management() -> Check {
+    match crate::plasma_windows::probe_availability() {
+        Ok(detail) => Check::ok(detail),
+        Err(e) => Check::fail(format!("{e:#}")),
     }
 }
 
@@ -446,7 +464,7 @@ fn readiness_report(
 
     if !can_query_windows {
         blockers.push(if is_kde() {
-            "KDE Plasma (KWin) window introspection is not yet implemented. Screenshots, AT-SPI tree inspection, and global ydotool input are available."
+            "KDE Plasma (KWin) window introspection is unavailable. Ensure KWin is running and org.kde.KWin is on the session bus. Screenshots, AT-SPI tree inspection, and global ydotool input are available."
         } else {
             "GNOME Shell window introspection is unavailable; targeted window focus and verification will be disabled."
         }.to_string());
@@ -475,7 +493,7 @@ fn readiness_report(
         }
     } else if !can_query_windows {
         if is_kde() {
-            "KWin window introspection is not yet implemented; AT-SPI, screenshots, and ydotool input are available.".to_string()
+            "KWin window introspection is unavailable; ensure KWin is running and org.kde.KWin is on the session bus. AT-SPI, screenshots, and ydotool input are available.".to_string()
         } else {
             "Run setup_window_targeting to install the Codex GNOME Shell extension backend, or enable GNOME Shell window introspection before using targeted keyboard input.".to_string()
         }
@@ -522,7 +540,7 @@ fn check_detail_contains_true(check: &Check) -> bool {
     check.ok && check.detail.to_ascii_lowercase().contains("true")
 }
 
-fn is_kde() -> bool {
+pub(crate) fn is_kde() -> bool {
     desktop_is_kde(&env::var("XDG_CURRENT_DESKTOP").unwrap_or_default())
 }
 
@@ -733,6 +751,7 @@ mod tests {
             } else {
                 Check::fail("missing")
             },
+            plasma_window_management: Check::fail("Not a KDE Plasma session"),
             can_list_windows,
             can_focus_apps: true,
             can_focus_windows,

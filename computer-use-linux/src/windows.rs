@@ -11,7 +11,7 @@ pub const GNOME_SHELL_INTROSPECT_BACKEND: &str = "gnome-shell-introspect";
 pub const GNOME_SHELL_EXTENSION_BACKEND: &str = "gnome-shell-extension";
 pub const GNOME_SHELL_EXTENSION_SERVICE: &str = "com.openai.Codex.WindowControl";
 pub const GNOME_SHELL_EXTENSION_OBJECT_PATH: &str = "/com/openai/Codex/WindowControl";
-pub const WINDOW_PERMISSION_HINT: &str = "Computer Use could not access a window list backend. On GNOME, targeted window input requires session-bus access plus either GNOME Shell Introspect permission or the Codex GNOME Shell extension backend (run setup_window_targeting to install it). On KDE Plasma, window listing is not yet supported.";
+pub const WINDOW_PERMISSION_HINT: &str = "Computer Use could not access a window list backend. On GNOME, targeted window input requires session-bus access plus either GNOME Shell Introspect permission or the Codex GNOME Shell extension backend (run setup_window_targeting to install it). On KDE Plasma, window listing requires KWin to be running and org.kde.KWin to be available on the session bus.";
 const FOCUS_VERIFY_ATTEMPTS: usize = 6;
 const FOCUS_VERIFY_DELAY: Duration = Duration::from_millis(50);
 
@@ -119,6 +119,9 @@ impl WindowTarget {
 }
 
 pub async fn list_windows() -> Result<Vec<WindowInfo>> {
+    if crate::diagnostics::is_kde() {
+        return crate::plasma_windows::list_kwin_windows().await;
+    }
     match list_extension_windows().await {
         Ok(windows) => Ok(windows),
         Err(extension_error) => match list_gnome_shell_introspect_windows().await {
