@@ -43,7 +43,6 @@ const {
   applyLinuxTrayCloseSettingPatch,
 } = require("./patches/launch-actions.js");
 const {
-  applyLinuxAvatarOverlayMousePassthroughPatch,
   applyBrowserUseNodeReplApprovalPatch,
   applyLinuxBrowserUseIabVisibleOnCreatePatch,
   applyLinuxChromeExtensionStatusPatch,
@@ -61,6 +60,9 @@ const {
   applyLinuxWillQuitDrainTimeoutPatch,
   applyLinuxWindowOptionsPatch,
 } = require("./patches/main-process.js");
+const {
+  applyLinuxAvatarOverlayMousePassthroughPatch,
+} = require("./patches/avatar-overlay.js");
 const {
   patchPackageJson,
   resolveDesktopName,

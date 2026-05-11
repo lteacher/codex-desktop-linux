@@ -59,7 +59,6 @@ const alreadyOpaqueBackgroundBundle =
   "process.platform===`linux`?{backgroundColor:e?t:n,backgroundMaterial:null}:{backgroundColor:r,backgroundMaterial:null}";
 const opaqueBackgroundBundleWithDriftingGw =
   "var cM=`#00000000`,lM=`#000000`,uM=`#f9f9f9`;function OM(e){return e===`avatarOverlay`||e===`browserCommentPopup`}function jM({platform:e,appearance:t,opaqueWindowsEnabled:n,prefersDarkColors:r}){return e===`win32`&&!OM(t)?n?{backgroundColor:r?lM:uM,backgroundMaterial:`none`}:{backgroundColor:cM,backgroundMaterial:`mica`}:{backgroundColor:cM,backgroundMaterial:null}}function gw(e){return e.page==null?e.snapshot.url:mw(e.page)}";
-
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -228,6 +227,7 @@ function currentBootstrapUpdaterBundleFixture() {
 
 function avatarOverlayBundleFixture() {
   return [
+    "let u=require(`node:child_process`);",
     "var rV=`/avatar-overlay`,zB={width:356,height:320},oV={width:112,height:121},sV={width:276,height:131};",
     "var fV=class{window=null;openingWindowPromise=null;anchor=pV({x:0,y:0,...zB},oV);dragState=null;layout=null;mascotSize=oV;momentumTimer=null;mousePassthroughEnabled=!1;placement=`top-end`;pointerInteractive=!1;rendererReady=!1;traySize=null;",
     "constructor(e,t){this.windowManager=e,this.globalState=t}",
@@ -408,7 +408,23 @@ test("adds Linux avatar overlay mouse passthrough recovery", () => {
   assert.match(patched, /codexLinuxSyncAvatarPointerInteractivity\(e\)/);
   assert.match(patched, /codexLinuxBuildAvatarInputShape\(e\)/);
   assert.match(patched, /codexLinuxApplyAvatarInputShape\(e\)/);
-  assert.match(patched, /typeof e\.setShape==`function`/);
+  assert.match(patched, /codexLinuxIsI3Session\(\)/);
+  assert.match(patched, /process\.env\.I3SOCK/);
+  assert.match(patched, /codexLinuxApplyAvatarCompositorHints\(e\)/);
+  assert.match(patched, /getNativeWindowHandle\?\.\(\)/);
+  assert.match(patched, /u\.execFile\(`xdotool`,\[`search`,`--pid`,String\(process\.pid\)\]/);
+  assert.match(patched, /u\.execFile\(`xwininfo`,\[`-id`,e\]/);
+  assert.match(patched, /u\.execFile\(`xprop`/);
+  assert.match(patched, /_GTK_FRAME_EXTENTS/);
+  assert.match(patched, /Override Redirect State/);
+  assert.match(patched, /Absolute upper-left X/);
+  assert.match(patched, /Number\(l\)!==t\.x/);
+  assert.match(patched, /Number\(h\)!==t\.y/);
+  assert.match(patched, /Number\(d\)!==t\.width/);
+  assert.doesNotMatch(patched, /let\[,l,u,d,f\]=c/);
+  assert.doesNotMatch(patched, /this\.codexLinuxIsI3Session\(\)\)\{this\.codexLinuxStopAvatarPassthroughRecovery\(\),this\.codexLinuxAvatarInputShapeKey=null,this\.pointerInteractive=!0,this\.mousePassthroughEnabled&&\(this\.mousePassthroughEnabled=!1\),e\.setIgnoreMouseEvents\(!1\);return\}/);
+  assert.match(patched, /if\(process\.platform===`linux`&&typeof e\.setShape==`function`\)\{/);
+  assert.doesNotMatch(patched, /typeof e\.setShape==`function`&&!this\.codexLinuxIsI3Session\(\)/);
   assert.match(patched, /if\(t==null\)return null/);
   assert.match(patched, /if\(t==null\)return!1;let n=JSON\.stringify\(t\)/);
   assert.match(patched, /e\.setShape\(t\),this\.codexLinuxAvatarInputShapeKey=n;return!0/);
@@ -424,10 +440,37 @@ test("adds Linux avatar overlay mouse passthrough recovery", () => {
   assert.match(patched, /displayBounds:n\.screen\.getDisplayNearestPoint\(n\.screen\.getCursorScreenPoint\(\)\)\.bounds\},process\.platform===`linux`&&\(this\.pointerInteractive=!0,this\.applyPointerInteractivityPolicy\(\)\)\}moveDrag\(e\)/);
   assert.match(patched, /this\.dragState=null,this\.reclampWindowToVisibleDisplay\(\{shouldPersist:!0\}\),process\.platform===`linux`&&this\.applyPointerInteractivityPolicy\(\)/);
   assert.match(patched, /this\.applyLayout\(r\),process\.platform===`linux`&&this\.applyPointerInteractivityPolicy\(\)/);
+  assert.match(patched, /this\.codexLinuxAvatarCompositorHintsApplied=!1,this\.codexLinuxAvatarCompositorHintsApplying=!1,this\.rendererReady=/);
+  assert.match(patched, /traySize:process\.platform===`linux`&&typeof this\.codexLinuxIsI3Session==`function`&&this\.codexLinuxIsI3Session\(\)\?this\.traySize:this\.traySize\?\?sV/);
   assert.match(patched, /this\.setWindowBounds\(e,r\.windowBounds\),this\.sendLayoutToRenderer\(e\),process\.platform===`linux`&&this\.applyPointerInteractivityPolicy\(\)/);
-  assert.match(patched, /e\.moveTop\(\),e\.showInactive\(\),process\.platform===`linux`&&this\.applyPointerInteractivityPolicy\(\)/);
+  assert.match(patched, /e\.moveTop\(\),e\.showInactive\(\),process\.platform===`linux`&&this\.codexLinuxApplyAvatarCompositorHints\(e\),process\.platform===`linux`&&this\.applyPointerInteractivityPolicy\(\)/);
   assert.doesNotMatch(patched, /codexLinuxRecoverAvatarPointerInteractivity/);
-  assert.match(patched, /this\.window===t&&\(this\.codexLinuxStopAvatarPassthroughRecovery\(\),this\.codexLinuxAvatarInputShapeKey=null,this\.cancelMomentum\(\)/);
+  assert.match(patched, /this\.window===t&&\(this\.codexLinuxStopAvatarPassthroughRecovery\(\),this\.codexLinuxAvatarInputShapeKey=null,this\.codexLinuxAvatarCompositorHintsApplied=!1,this\.codexLinuxAvatarCompositorHintsApplying=!1,this\.cancelMomentum\(\)/);
+});
+
+test("upgrades older i3 avatar compositor hint patches", () => {
+  const source =
+    "let u=require(`node:child_process`);class A{createWindow(){let t={webContents:{id:1}};return this.window=t,this.codexLinuxApplyAvatarCompositorHints(t),this.rendererReady=this.windowManager.isWebContentsReady(t.webContents.id),t}codexLinuxIsI3Session(){let e=[process.env.XDG_CURRENT_DESKTOP,process.env.DESKTOP_SESSION,process.env.I3SOCK].filter(Boolean).join(`:`).toLowerCase();return/(^|[:;/])i3([:;/.-]|$)/.test(e)}codexLinuxApplyAvatarCompositorHints(e){if(process.platform!==`linux`||!this.codexLinuxIsI3Session()||this.codexLinuxAvatarCompositorHintsApplied||e==null||e.isDestroyed()||!process.env.DISPLAY)return;let t=null;try{let n=e.getNativeWindowHandle?.();n!=null&&n.length>=4&&(t=n.readUInt32LE(0))}catch{}if(!Number.isFinite(t)||t<=0)return;this.codexLinuxAvatarCompositorHintsApplied=!0;try{u.execFile(`xprop`,[`-id`,String(t),`-f`,`_GTK_FRAME_EXTENTS`,`32c`,`-set`,`_GTK_FRAME_EXTENTS`,`0, 0, 0, 0`],{timeout:1e3},e=>{e&&(this.codexLinuxAvatarCompositorHintsApplied=!1)})}catch{this.codexLinuxAvatarCompositorHintsApplied=!1}}codexLinuxStopAvatarPassthroughRecovery(){}}";
+  const patched = applyPatchTwice(applyLinuxAvatarOverlayMousePassthroughPatch, source);
+
+  assert.match(patched, /u\.execFile\(`xdotool`,\[`search`,`--pid`,String\(process\.pid\)\]/);
+  assert.match(patched, /u\.execFile\(`xwininfo`,\[`-id`,e\]/);
+  assert.match(patched, /Override Redirect State/);
+  assert.match(patched, /this\.window=t,this\.codexLinuxAvatarCompositorHintsApplied=!1,this\.codexLinuxAvatarCompositorHintsApplying=!1,this\.rendererReady=/);
+  assert.doesNotMatch(patched, /let t=null;try\{let n=e\.getNativeWindowHandle/);
+  assert.doesNotMatch(patched, /this\.window=t,this\.codexLinuxApplyAvatarCompositorHints\(t\),this\.rendererReady=/);
+});
+
+test("upgrades intermediate i3 avatar compositor hint patches", () => {
+  const source =
+    "let u=require(`node:child_process`);class A{createWindow(){let t={webContents:{id:1}};return this.window=t,this.codexLinuxAvatarCompositorHintsApplied=!1,process.platform===`linux`&&this.codexLinuxApplyAvatarCompositorHints(t),this.rendererReady=this.windowManager.isWebContentsReady(t.webContents.id),t}codexLinuxIsI3Session(){let e=[process.env.XDG_CURRENT_DESKTOP,process.env.DESKTOP_SESSION,process.env.I3SOCK].filter(Boolean).join(`:`).toLowerCase();return/(^|[:;/])i3([:;/.-]|$)/.test(e)}codexLinuxApplyAvatarCompositorHints(e){if(process.platform!==`linux`||!this.codexLinuxIsI3Session()||this.codexLinuxAvatarCompositorHintsApplied||e==null||e.isDestroyed()||!process.env.DISPLAY)return;let t=[];try{let n=e.getNativeWindowHandle?.();n!=null&&n.length>=4&&t.push(String(n.readUInt32LE(0)))}catch{}this.codexLinuxAvatarCompositorHintsApplying=!0;let n=e=>{let t=[...new Set(e)].filter(e=>/^[0-9]+$/.test(e)&&e!==`0`);if(t.length===0){this.codexLinuxAvatarCompositorHintsApplying=!1;return}let n=t.length,r=!1,i=()=>{n--,n===0&&(this.codexLinuxAvatarCompositorHintsApplying=!1,r&&(this.codexLinuxAvatarCompositorHintsApplied=!0))};for(let a of t)try{u.execFile(`xprop`,[`-id`,a,`-f`,`_GTK_FRAME_EXTENTS`,`32c`,`-set`,`_GTK_FRAME_EXTENTS`,`0, 0, 0, 0`],{timeout:1e3},e=>{e||(r=!0),i()})}catch{i()}};try{u.execFile(`xdotool`,[`search`,`--pid`,String(process.pid)],{timeout:1e3},(e,r)=>{n([...t,...String(r??``).trim().split(/\\s+/).filter(Boolean)])})}catch{n(t)}}codexLinuxStopAvatarPassthroughRecovery(){}}";
+  const patched = applyPatchTwice(applyLinuxAvatarOverlayMousePassthroughPatch, source);
+
+  assert.match(patched, /this\.window=t,this\.codexLinuxAvatarCompositorHintsApplied=!1,this\.codexLinuxAvatarCompositorHintsApplying=!1,this\.rendererReady=/);
+  assert.match(patched, /u\.execFile\(`xwininfo`,\[`-id`,e\]/);
+  assert.match(patched, /Override Redirect State/);
+  assert.doesNotMatch(patched, /this\.codexLinuxAvatarCompositorHintsApplied=!1,process\.platform===`linux`&&this\.codexLinuxApplyAvatarCompositorHints\(t\),this\.rendererReady=/);
+  assert.doesNotMatch(patched, /for\(let a of t\)try\{u\.execFile\(`xprop`/);
 });
 
 test("adds Linux window icon handling when an icon asset is available", () => {

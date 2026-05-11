@@ -20,7 +20,6 @@ const {
   patchAssetFiles,
 } = require("./shared.js");
 const {
-  applyLinuxAvatarOverlayMousePassthroughPatch,
   applyBrowserUseNodeReplApprovalPatch,
   applyLinuxBrowserUseIabVisibleOnCreatePatch,
   applyLinuxChromeExtensionStatusPatch,
@@ -38,6 +37,9 @@ const {
   applyLinuxWillQuitDrainTimeoutPatch,
   applyLinuxWindowOptionsPatch,
 } = require("./main-process.js");
+const {
+  applyLinuxAvatarOverlayMousePassthroughPatch,
+} = require("./avatar-overlay.js");
 const {
   applyLinuxChromePluginAutoInstallPatch,
 } = require("./chrome-plugin.js");
