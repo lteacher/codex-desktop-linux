@@ -22,7 +22,7 @@
 
         codexDmg = pkgs.fetchurl {
           url = "https://persistent.oaistatic.com/codex-app-prod/Codex.dmg";
-          hash = "sha256-4FroU+UDXJSbB5FfjGhiGyXrQ/R+UYXuaYPoR7oXbyc=";
+          hash = "sha256-WTeptN8D9hF2ffvlJKppfLTOJr5Z0hjokHCnGX6drk0=";
         };
 
         electronLibs = with pkgs; [
@@ -194,7 +194,7 @@ PY
             pkgs.gnused
             pkgs.makeWrapper
             pkgs.nodejs
-            pkgs.p7zip
+            pkgs._7zz
             pkgs.patchelf
             pkgs.python3
             pkgs.unzip
@@ -202,7 +202,7 @@ PY
 
           outputHashAlgo = "sha256";
           outputHashMode = "recursive";
-          outputHash = "sha256-am6vffCgLeArVmji3tcK5YhdU19fYT+pjO23Vv7rIzI=";
+          outputHash = "sha256-8IX6OpYitjbazWLUBi6h8iRDxOMir5Kdezry8OThM2Q=";
           unsafeDiscardReferences.out = true;
 
           dontConfigure = true;
@@ -240,8 +240,6 @@ PY
               --replace-fail "npx asar" "asar"
             substituteInPlace "$source_dir/scripts/lib/dmg.sh" \
               --replace-fail "npx --yes asar" "asar"
-            substituteInPlace "$source_dir/scripts/lib/native-modules.sh" \
-              --replace-fail "npx --yes @electron/rebuild" "electron-rebuild"
 
             export CODEX_INSTALL_DIR="$out/opt/codex-desktop"
             ${pkgs.bash}/bin/bash "$source_dir/install.sh" "$source_dir/Codex.dmg"
@@ -344,7 +342,7 @@ NODE
             pkgs.bash
             pkgs.nodejs
             pkgs.python3
-            pkgs.p7zip
+            pkgs._7zz
             pkgs.curl
             pkgs.unzip
             pkgs.gnumake
@@ -400,7 +398,7 @@ NODE
           packages = [
             pkgs.nodejs
             pkgs.python3
-            pkgs.p7zip
+            pkgs._7zz
             pkgs.curl
             pkgs.unzip
             pkgs.gnumake
