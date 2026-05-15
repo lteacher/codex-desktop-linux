@@ -7,6 +7,20 @@ const path = require("node:path");
 // They stay fail-soft because upstream chunk names and minified symbols drift.
 function applyLinuxOpaqueWindowsDefaultPatch(currentSource) {
   let patchedSource = currentSource;
+  let warnedMissingNeedle = false;
+  const linuxDefaultPatched = () =>
+    patchedSource.includes("opaqueWindows:e?.opaqueWindows??(typeof navigator<`u`&&") ||
+    patchedSource.includes("navigator.userAgent.includes(`Linux`)&&") ||
+    patchedSource.includes("document.documentElement.dataset.codexOs===`linux`&&");
+  const warnMissingNeedle = () => {
+    if (warnedMissingNeedle || linuxDefaultPatched()) {
+      return;
+    }
+    warnedMissingNeedle = true;
+    console.warn(
+      "WARN: Could not find Linux opaque window default insertion point — skipping settings default patch",
+    );
+  };
 
   const mergeNeedle = "opaqueWindows:e?.opaqueWindows??n.opaqueWindows,semanticColors:";
   const mergePatch =
@@ -17,9 +31,7 @@ function applyLinuxOpaqueWindowsDefaultPatch(currentSource) {
   } else if (patchedSource.includes(mergeNeedle)) {
     patchedSource = patchedSource.replace(mergeNeedle, mergePatch);
   } else if (patchedSource.includes("opaqueWindows") && patchedSource.includes("semanticColors")) {
-    console.warn(
-      "WARN: Could not find Linux opaque window default insertion point — skipping settings default patch",
-    );
+    warnMissingNeedle();
   }
 
   const settingsNeedle =
@@ -41,6 +53,20 @@ function applyLinuxOpaqueWindowsDefaultPatch(currentSource) {
     patchedSource = patchedSource.replace(currentSettingsNeedle, currentSettingsPatch);
   }
 
+  const currentSettingsRegex =
+    /setThemePatch:([A-Za-z_$][\w$]*),theme:([A-Za-z_$][\w$]*)\}=([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\),([A-Za-z_$][\w$]*)=/;
+  if (patchedSource.includes("navigator.userAgent.includes(`Linux`)&&x?.opaqueWindows==null")) {
+    // Already patched by the current-settings branch above.
+  } else if (/navigator\.userAgent\.includes\(`Linux`\)&&[A-Za-z_$][\w$]*\?\.opaqueWindows==null/.test(patchedSource)) {
+    // Already patched with drifted minified names.
+  } else if (currentSettingsRegex.test(patchedSource)) {
+    patchedSource = patchedSource.replace(
+      currentSettingsRegex,
+      (match, setThemePatchVar, themeVar, hookVar, variantVar, nextVar) =>
+        `setThemePatch:${setThemePatchVar},theme:${themeVar}}=${hookVar}(${variantVar});navigator.userAgent.includes(\`Linux\`)&&${themeVar}?.opaqueWindows==null&&(${themeVar}={...${themeVar},opaqueWindows:!0});let ${nextVar}=`,
+    );
+  }
+
   const runtimeNeedle =
     "let T=o===`light`?C:w,E;if(T.opaqueWindows&&!XZ()){";
   const runtimePatch =
@@ -58,6 +84,40 @@ function applyLinuxOpaqueWindowsDefaultPatch(currentSource) {
     // Already patched.
   } else if (patchedSource.includes(currentRuntimeNeedle)) {
     patchedSource = patchedSource.replace(currentRuntimeNeedle, currentRuntimePatch);
+  }
+
+  if (!patchedSource.includes("document.documentElement.dataset.codexOs===`linux`&&")) {
+    const currentRuntimeRegex =
+      /let\{data:([A-Za-z_$][\w$]*)\}=Qc\([A-Za-z_$][\w$]*\.APPEARANCE_LIGHT_CHROME_THEME,[A-Za-z_$][\w$]*\).*?let\{data:([A-Za-z_$][\w$]*)\}=Qc\([A-Za-z_$][\w$]*\.APPEARANCE_DARK_CHROME_THEME,[A-Za-z_$][\w$]*\).*?let ([A-Za-z_$][\w$]*)=([A-Za-z_$][\w$]*)===`light`\?([A-Za-z_$][\w$]*):([A-Za-z_$][\w$]*),/;
+    const currentRuntimeMatch = patchedSource.match(currentRuntimeRegex);
+    if (currentRuntimeMatch != null) {
+      const [
+        ,
+        lightThemeRawVar,
+        darkThemeRawVar,
+        selectedThemeVar,
+        resolvedVariantVar,
+        lightThemeVar,
+        darkThemeVar,
+      ] = currentRuntimeMatch;
+      const selectorNeedle =
+        `let ${selectedThemeVar}=${resolvedVariantVar}===\`light\`?${lightThemeVar}:${darkThemeVar},`;
+      const selectorPatch =
+        `let ${selectedThemeVar}=${resolvedVariantVar}===\`light\`?${lightThemeVar}:${darkThemeVar};document.documentElement.dataset.codexOs===\`linux\`&&((${resolvedVariantVar}===\`light\`?${lightThemeRawVar}:${darkThemeRawVar})?.opaqueWindows==null&&(${selectedThemeVar}={...${selectedThemeVar},opaqueWindows:!0}));let `;
+      if (patchedSource.includes(selectorNeedle)) {
+        patchedSource = patchedSource.replace(selectorNeedle, selectorPatch);
+      }
+    }
+  }
+
+  if (
+    patchedSource === currentSource &&
+    !linuxDefaultPatched() &&
+    (currentSource.includes("opaqueWindows") ||
+      currentSource.includes("electron-opaque") ||
+      currentSource.includes("translucentSidebar"))
+  ) {
+    warnMissingNeedle();
   }
 
   return patchedSource;
