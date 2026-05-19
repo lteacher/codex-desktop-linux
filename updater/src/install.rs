@@ -207,6 +207,7 @@ pub fn install_deb(path: &Path) -> Result<()> {
         "Debian package not found: {}",
         path.display()
     );
+    ensure_codex_package(path)?;
     ensure_upgrade_path(path)?;
 
     if program_exists(APT_CANDIDATES, "apt") {
@@ -222,6 +223,7 @@ pub fn install_deb(path: &Path) -> Result<()> {
 /// Installs a rebuilt RPM package on the local machine.
 pub fn install_rpm(path: &Path) -> Result<()> {
     anyhow::ensure!(path.exists(), "RPM package not found: {}", path.display());
+    ensure_codex_package(path)?;
     ensure_upgrade_path_rpm(path)?;
 
     if program_exists(DNF_CANDIDATES, "dnf") || program_exists(DNF_CANDIDATES, "dnf5") {
@@ -247,6 +249,7 @@ pub fn install_pacman(path: &Path) -> Result<()> {
         "Pacman package not found: {}",
         path.display()
     );
+    ensure_codex_package(path)?;
     ensure_upgrade_path_pacman(path)?;
 
     let mut command = pacman_install_command(path);
@@ -278,6 +281,26 @@ fn run_install(command: &mut Command) -> Result<()> {
     anyhow::ensure!(
         status.success(),
         "installation command exited with {status}"
+    );
+    Ok(())
+}
+
+pub(crate) fn ensure_codex_package(path: &Path) -> Result<()> {
+    match PackageKind::from_path(path) {
+        PackageKind::Deb => ensure_package_name(&deb_package_name(path)?, path),
+        PackageKind::Rpm => ensure_package_name(&rpm_package_name(path)?, path),
+        PackageKind::Pacman => {
+            pacman_package_version(path)?;
+            ensure_package_name(&pacman_package_name(path)?, path)
+        }
+    }
+}
+
+fn ensure_package_name(package_name: &str, path: &Path) -> Result<()> {
+    anyhow::ensure!(
+        package_name == PACKAGE_NAME,
+        "Refusing to install package {package_name} from {}; expected {PACKAGE_NAME}",
+        path.display()
     );
     Ok(())
 }
@@ -432,6 +455,17 @@ fn updater_binary_for_privileged_install(current_exe: &Path) -> PathBuf {
     }
 }
 
+fn deb_package_name(path: &Path) -> Result<String> {
+    let output = Command::new(program_path(DPKG_DEB_CANDIDATES, "dpkg-deb"))
+        .arg("-f")
+        .arg(path)
+        .arg("Package")
+        .output()
+        .context("Failed to inspect Debian package metadata")?;
+
+    package_metadata_field(output, "dpkg-deb", "package name", path)
+}
+
 fn deb_package_version(path: &Path) -> Result<String> {
     let output = Command::new(program_path(DPKG_DEB_CANDIDATES, "dpkg-deb"))
         .arg("-f")
@@ -456,6 +490,18 @@ fn deb_package_version(path: &Path) -> Result<String> {
         path.display()
     );
     Ok(version)
+}
+
+fn rpm_package_name(path: &Path) -> Result<String> {
+    let output = Command::new(program_path(RPM_CANDIDATES, "rpm"))
+        .arg("-qp")
+        .arg("--queryformat")
+        .arg("%{NAME}")
+        .arg(path)
+        .output()
+        .context("Failed to inspect RPM package metadata")?;
+
+    package_metadata_field(output, "rpm", "package name", path)
 }
 
 fn rpm_package_version(path: &Path) -> Result<String> {
@@ -483,6 +529,40 @@ fn rpm_package_version(path: &Path) -> Result<String> {
         path.display()
     );
     Ok(version)
+}
+
+fn pacman_package_name(path: &Path) -> Result<String> {
+    let output = Command::new(program_path(PACMAN_CANDIDATES, "pacman"))
+        .args(["-Qqp"])
+        .arg(path)
+        .output()
+        .context("Failed to inspect pacman package metadata")?;
+
+    package_metadata_field(output, "pacman", "package name", path)
+}
+
+fn package_metadata_field(
+    output: std::process::Output,
+    program: &str,
+    field: &str,
+    path: &Path,
+) -> Result<String> {
+    anyhow::ensure!(
+        output.status.success(),
+        "{program} could not read the {field} from {}",
+        path.display()
+    );
+
+    let value = String::from_utf8(output.stdout)
+        .with_context(|| format!("{program} returned a non-UTF8 {field}"))?
+        .trim()
+        .to_string();
+    anyhow::ensure!(
+        !value.is_empty(),
+        "{program} returned an empty {field} for {}",
+        path.display()
+    );
+    Ok(value)
 }
 
 fn is_version_newer(candidate: &str, installed: &str) -> Result<bool> {
@@ -946,5 +1026,28 @@ mod tests {
             "2026.04.02.120000-1"
         );
         Ok(())
+    }
+
+    #[test]
+    fn rejects_mismatched_package_name() {
+        let error = ensure_package_name("not-codex", Path::new("/tmp/not-codex.deb"))
+            .expect_err("foreign package names must be rejected");
+
+        assert!(error.to_string().contains("expected codex-desktop"));
+    }
+
+    #[test]
+    fn accepts_codex_package_name() -> Result<()> {
+        ensure_package_name("codex-desktop", Path::new("/tmp/codex-desktop.deb"))
+    }
+
+    #[test]
+    fn rejects_non_codex_pacman_package_filename() {
+        let error = ensure_codex_package(Path::new(
+            "/tmp/not-codex-2026.04.02.120000-1-x86_64.pkg.tar.zst",
+        ))
+        .expect_err("foreign pacman packages must be rejected");
+
+        assert!(error.to_string().contains("codex-desktop-"));
     }
 }

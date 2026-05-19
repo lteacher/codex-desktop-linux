@@ -1,6 +1,6 @@
 //! Explicit rollback package installation helpers.
 
-use crate::install::PackageKind;
+use crate::install::{ensure_codex_package, PackageKind};
 use anyhow::{Context, Result};
 use std::{
     path::{Path, PathBuf},
@@ -21,6 +21,7 @@ pub fn install_deb(path: &Path) -> Result<()> {
         "Debian rollback package not found: {}",
         path.display()
     );
+    ensure_codex_package(path)?;
 
     if program_exists(APT_CANDIDATES, "apt") {
         let mut command = apt_command(path)?;
@@ -38,6 +39,7 @@ pub fn install_rpm(path: &Path) -> Result<()> {
         "RPM rollback package not found: {}",
         path.display()
     );
+    ensure_codex_package(path)?;
 
     if program_exists(DNF_CANDIDATES, "dnf") || program_exists(DNF_CANDIDATES, "dnf5") {
         let mut command = dnf_command(path)?;
@@ -61,6 +63,7 @@ pub fn install_pacman(path: &Path) -> Result<()> {
         "Pacman rollback package not found: {}",
         path.display()
     );
+    ensure_codex_package(path)?;
 
     let mut command = pacman_command(path);
     run_install(&mut command).context("pacman rollback install failed")
