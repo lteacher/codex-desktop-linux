@@ -1572,8 +1572,25 @@ test("composer control patch repurposes the voice button for conversation mode f
   assert.match(patched, /startDictation:se/);
   assert.match(patched, /stopDictation:le/);
   assert.match(patched, /onStop:P/);
-  assert.match(patched, /Start conversation mode/);
+  assert.equal(
+    patched.match(/defaultMessage:codexLinuxConversationActive\?`Stop conversation mode`:`Start conversation mode`/g)?.length,
+    2,
+  );
+  assert.doesNotMatch(patched, /defaultMessage:`Start conversation mode`/);
   assert.match(patched, /ue\.startRealtime/);
+});
+
+test("composer control patch repairs stale static conversation button hints", () => {
+  const once = applyComposerControlPatch(composerControlSource);
+  const stale = once.replace(
+    /defaultMessage:codexLinuxConversationActive\?`Stop conversation mode`:`Start conversation mode`/g,
+    "defaultMessage:`Start conversation mode`",
+  );
+  const patched = twice(applyComposerControlPatch, stale);
+  assert.equal(
+    patched.match(/defaultMessage:codexLinuxConversationActive\?`Stop conversation mode`:`Start conversation mode`/g)?.length,
+    2,
+  );
 });
 
 test("composer control patch follows the current composer voiceControls shape", () => {

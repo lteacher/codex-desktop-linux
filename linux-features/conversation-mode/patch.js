@@ -199,9 +199,21 @@ function applyComposerControlPatch(source) {
     warn("Could not find composer voice button click handler", "conversation mode composer control patch");
   }
 
-  patched = patched
-    .replace(/defaultMessage:`Start realtime voice`/g, "defaultMessage:`Start conversation mode`")
-    .replace(/defaultMessage:`Start realtime voice mode in the composer`/g, "defaultMessage:`Start conversation mode in the composer`");
+  if (patched.includes("codexLinuxConversationActive=globalThis.codexLinuxConversationIsActive")) {
+    patched = patched
+      .replace(
+        /defaultMessage:`(?:Start realtime voice|Start conversation mode)`/g,
+        "defaultMessage:codexLinuxConversationActive?`Stop conversation mode`:`Start conversation mode`",
+      )
+      .replace(
+        /defaultMessage:`(?:Start realtime voice mode|Start conversation mode) in the composer`/g,
+        "defaultMessage:codexLinuxConversationActive?`Stop conversation mode in the composer`:`Start conversation mode in the composer`",
+      );
+  } else {
+    patched = patched
+      .replace(/defaultMessage:`Start realtime voice`/g, "defaultMessage:`Start conversation mode`")
+      .replace(/defaultMessage:`Start realtime voice mode in the composer`/g, "defaultMessage:`Start conversation mode in the composer`");
+  }
 
   return patched;
 }
