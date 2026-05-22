@@ -685,7 +685,8 @@ path = Path(sys.argv[1])
 source = path.read_text(encoding="utf-8")
 pattern = re.compile(
     r'function (?P<helper>[A-Za-z_$][\w$]*)\(\)\{'
-    r'let (?P<bridge>[A-Za-z_$][\w$]*)=globalThis\.nodeRepl\?\.nativePipe;'
+    r'let (?P<bridge>[A-Za-z_$][\w$]*)='
+    r'(?:globalThis\.nodeRepl\?\.nativePipe|import\.meta\.__codexNativePipe);'
     r'return (?P=bridge)==null\|\|typeof (?P=bridge)\.createConnection!="function"\?null:(?P=bridge)\}'
 )
 match = pattern.search(source)
