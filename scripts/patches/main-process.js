@@ -730,6 +730,7 @@ function applyBrowserUseNodeReplApprovalPatch(currentSource) {
     "startup_timeout_sec:120,tools:{js:{approval_mode:`approve`}},env:{";
   const needle = "startup_timeout_sec:120,env:{";
   let patchedSource = currentSource;
+  let patchedTrustedHashes = false;
   if (patchedSource.includes(needle)) {
     patchedSource = patchedSource.split(needle).join(approvalPatch);
   }
@@ -745,10 +746,65 @@ function applyBrowserUseNodeReplApprovalPatch(currentSource) {
     },
   );
 
+  const trustedHashesRegex =
+    /trustedBrowserClientSha256s:([^,{}]+)\|\|([^,{}]+)\?([A-Za-z_$][\w$]*):\[\]/g;
+  patchedSource = patchedSource.replace(
+    trustedHashesRegex,
+    (match, browserUseEnabledVar, nativePipeEnabledVar, trustedHashesVar) => {
+      if (match.includes("codexLinuxTrustedBrowserClientSha256s(")) {
+        return match;
+      }
+      patchedTrustedHashes = true;
+      return `trustedBrowserClientSha256s:${browserUseEnabledVar}||${nativePipeEnabledVar}?codexLinuxTrustedBrowserClientSha256s(${trustedHashesVar}):[]`;
+    },
+  );
+
+  if (
+    patchedTrustedHashes &&
+    !patchedSource.includes("function codexLinuxTrustedBrowserClientSha256s(")
+  ) {
+    const fsVar = requireName(patchedSource, "node:fs");
+    const pathVar = requireName(patchedSource, "node:path");
+    const cryptoVar = requireName(patchedSource, "node:crypto");
+    if (fsVar == null || pathVar == null || cryptoVar == null) {
+      console.warn(
+        "WARN: Could not find fs/path/crypto aliases — skipping Linux Browser Use trusted hash patch",
+      );
+      patchedSource = patchedSource.replace(
+        /trustedBrowserClientSha256s:([^,{}]+)\|\|([^,{}]+)\?codexLinuxTrustedBrowserClientSha256s\(([A-Za-z_$][\w$]*)\):\[\]/g,
+        "trustedBrowserClientSha256s:$1||$2?$3:[]",
+      );
+      patchedTrustedHashes = false;
+    } else {
+      const helper =
+        `function codexLinuxTrustedBrowserClientSha256s(e,t=process.resourcesPath){if(process.platform!==\`linux\`)return e;let n=Array.isArray(e)?[...e]:[],r=t??"";if(r.length===0)return Array.from(new Set(n));for(let a of[\`browser\`,\`chrome\`])try{let e=(0,${pathVar}.join)(r,\`plugins\`,\`openai-bundled\`,\`plugins\`,a,\`scripts\`,\`browser-client.mjs\`);(0,${fsVar}.existsSync)(e)&&n.push((0,${cryptoVar}.createHash)(\`sha256\`).update((0,${fsVar}.readFileSync)(e)).digest(\`hex\`))}catch{}return Array.from(new Set(n))}`;
+      const strictDirective = '"use strict";';
+      const helperInsertionIndex = patchedSource.startsWith(strictDirective)
+        ? strictDirective.length
+        : 0;
+      patchedSource =
+        patchedSource.slice(0, helperInsertionIndex) +
+        helper +
+        patchedSource.slice(helperInsertionIndex);
+    }
+  }
+
+  if (
+    !patchedTrustedHashes &&
+    !patchedSource.includes("codexLinuxTrustedBrowserClientSha256s(") &&
+    patchedSource.includes("NODE_REPL_TRUSTED_BROWSER_CLIENT_SHA256S")
+  ) {
+    console.warn(
+      "WARN: Could not find Browser Use trusted hash insertion point — skipping Linux Browser Use trusted hash patch",
+    );
+  }
+
   if (
     patchedSource === currentSource &&
     !patchedSource.includes(approvalPatch) &&
-    !patchedAnyCurrentRuntimeConfig
+    !patchedAnyCurrentRuntimeConfig &&
+    !patchedTrustedHashes &&
+    !patchedSource.includes("codexLinuxTrustedBrowserClientSha256s(")
   ) {
     console.warn(
       "WARN: Could not find Browser Use node_repl config insertion point — skipping node_repl approval patch",
