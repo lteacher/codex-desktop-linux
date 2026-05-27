@@ -1012,6 +1012,67 @@ JSON
     assert_contains "$output_log" "$plugin_cache"
 }
 
+test_setup_native_wizard_accepts_numbered_feature_selection() {
+    info "Checking setup-native wizard accepts numbered feature selections"
+    local workspace="$TMP_DIR/setup-native-numbered-features"
+    local features_root="$workspace/linux-features"
+    local config="$workspace/features.json"
+    local output_log="$workspace/output.log"
+    local fake_home="$workspace/home"
+
+    make_wizard_feature_root "$features_root"
+    printf '%s\n' '{"enabled":["remote-mobile-control"]}' > "$config"
+
+    if ! command -v script >/dev/null 2>&1; then
+        info "Skipping numbered feature selection smoke test because script(1) is unavailable"
+        return
+    fi
+
+    (
+        export HOME="$fake_home"
+        export XDG_CONFIG_HOME="$fake_home/.config"
+        export CODEX_LINUX_FEATURES_ROOT="$features_root"
+        export CODEX_LINUX_FEATURES_CONFIG="$config"
+        {
+            printf '1,3-4\n'
+            printf '5\n'
+            printf '\n'
+            printf '\n'
+            printf '\n'
+            printf '\n'
+        } | script -qefc "bash $REPO_DIR/scripts/bootstrap-wizard.sh" /dev/null >"$output_log"
+    )
+
+    assert_json_enabled_equals "$config" '["conversation-mode","read-aloud","read-aloud-mcp"]'
+    assert_contains "$output_log" "1\\. \\[available\\] conversation-mode - Conversation mode"
+    assert_contains "$output_log" "5\\. \\[enabled\\] remote-mobile-control - Experimental Remote Mobile Control"
+    assert_contains "$output_log" "Enable feature ids or numbers for the next build"
+    assert_contains "$output_log" "Disable feature ids or numbers for the next build"
+}
+
+test_setup_native_wizard_rejects_out_of_range_feature_numbers() {
+    info "Checking setup-native wizard explains out-of-range feature numbers"
+    local workspace="$TMP_DIR/setup-native-feature-number-range"
+    local features_root="$workspace/linux-features"
+    local config="$workspace/features.json"
+    local output_log="$workspace/output.log"
+
+    make_wizard_feature_root "$features_root"
+    printf '%s\n' '{"enabled":[]}' > "$config"
+
+    if CODEX_BOOTSTRAP_NONINTERACTIVE=1 \
+        CODEX_LINUX_FEATURES_ROOT="$features_root" \
+        CODEX_LINUX_FEATURES_CONFIG="$config" \
+        CODEX_LINUX_FEATURES="99" \
+            bash "$REPO_DIR/scripts/bootstrap-wizard.sh" >"$output_log" 2>&1; then
+        fail "setup wizard should reject out-of-range feature numbers"
+    fi
+
+    assert_contains "$output_log" "Feature number 99 is out of range for enable"
+    assert_contains "$output_log" "Use feature ids, numbers, or ranges like 1,3-4."
+    assert_json_enabled_equals "$config" '[]'
+}
+
 test_setup_native_wizard_summary_keeps_existing_config() {
     info "Checking setup-native wizard read-only summary keeps existing feature config"
     local workspace="$TMP_DIR/setup-native-summary"
@@ -1332,6 +1393,43 @@ test_setup_native_wizard_dry_run_cleanup_allows_noninteractive_preview() {
     assert_file_exists "$key_file"
     assert_contains "$output_log" "Would delete: $key_file"
     assert_not_contains "$output_log" "Cleanup requires an interactive terminal"
+}
+
+test_setup_native_wizard_blank_interactive_cleanup_ids_skip_cleanup() {
+    info "Checking setup-native wizard skips cleanup when interactive feature ids are blank"
+    local workspace="$TMP_DIR/setup-native-cleanup-blank"
+    local features_root="$workspace/linux-features"
+    local config="$workspace/features.json"
+    local output_log="$workspace/output.log"
+    local fake_home="$workspace/home"
+
+    make_wizard_feature_root "$features_root"
+    printf '%s\n' '{"enabled":["remote-mobile-control"]}' > "$config"
+
+    if ! command -v script >/dev/null 2>&1; then
+        info "Skipping blank cleanup smoke test because script(1) is unavailable"
+        return
+    fi
+
+    (
+        export HOME="$fake_home"
+        export XDG_CONFIG_HOME="$fake_home/.config"
+        export CODEX_LINUX_FEATURES_ROOT="$features_root"
+        export CODEX_LINUX_FEATURES_CONFIG="$config"
+        {
+            printf '\n'
+            printf '\n'
+            printf '\n'
+            printf 'y\n'
+            printf '\n'
+            printf '\n'
+            printf '\n'
+        } | script -qefc "bash $REPO_DIR/scripts/bootstrap-wizard.sh" /dev/null >"$output_log"
+    )
+
+    assert_json_enabled_equals "$config" '["remote-mobile-control"]'
+    assert_contains "$output_log" "No cleanup feature ids provided; skipping feature cleanup."
+    assert_contains "$output_log" "Default native package mode includes codex-update-manager"
 }
 
 test_setup_native_wizard_dry_run_cleanup_does_not_delete_confirmed_paths() {
@@ -4896,6 +4994,8 @@ main() {
     test_setup_native_wizard_rejects_invalid_feature_ids
     test_setup_native_wizard_rejects_conflicting_feature_ids
     test_setup_native_wizard_disable_is_non_destructive
+    test_setup_native_wizard_accepts_numbered_feature_selection
+    test_setup_native_wizard_rejects_out_of_range_feature_numbers
     test_setup_native_wizard_summary_keeps_existing_config
     test_setup_native_wizard_uses_package_name_for_installed_state
     test_setup_native_wizard_portal_summary_survives_busctl_sigpipe
@@ -4907,6 +5007,7 @@ main() {
     test_setup_native_wizard_sway_hint_is_conservative
     test_setup_native_wizard_cleanup_requires_interactive_confirmation
     test_setup_native_wizard_dry_run_cleanup_allows_noninteractive_preview
+    test_setup_native_wizard_blank_interactive_cleanup_ids_skip_cleanup
     test_setup_native_wizard_dry_run_cleanup_does_not_delete_confirmed_paths
     test_setup_native_wizard_cleanup_deletes_only_confirmed_paths
     test_upstream_build_app_workflow_tracks_dmg_metadata
