@@ -2340,6 +2340,7 @@ detect_body = source.split("detect_warm_start() {", 1)[1].split("send_warm_start
 launch_body = source.split("launch_electron() {", 1)[1].split("load_packaged_runtime_helper", 1)[0]
 runtime_body = source.split("trap cleanup_launcher EXIT", 1)[1].split("launch_electron", 1)[0]
 webview_probe_body = source.split("webview_port_is_open() {", 1)[1].split("wait_for_webview_server() {", 1)[0]
+wait_body = source.split("wait_for_webview_server() {", 1)[1].split("verify_webview_origin() {", 1)[0]
 prelaunch_hooks_body = source.split("run_feature_prelaunch_hooks() {", 1)[1].split("bundled_plugin_version() {", 1)[0]
 cold_start_hooks_body = source.split("run_cold_start_hooks() {", 1)[1].split("run_cli_preflight() {", 1)[0]
 stop_body = source.split("stop_owned_webview_server() {", 1)[1].split("owned_webview_server_pid() {", 1)[0]
@@ -2364,6 +2365,10 @@ if '( trap - EXIT\n      exec 3<>/dev/tcp/127.0.0.1/"$CODEX_LINUX_WEBVIEW_PORT" 
     raise SystemExit("webview port probe must not inherit the launcher EXIT cleanup trap")
 if '( trap - EXIT\n      sleep 0.2' not in webview_probe_body:
     raise SystemExit("webview port probe watchdog must not inherit the launcher EXIT cleanup trap")
+if "webview_origin_is_reachable_fast" not in wait_body or "webview_port_is_open" in wait_body:
+    raise SystemExit("wait_for_webview_server must use the HTTP origin as the readiness signal")
+if "if webview_origin_is_reachable;" not in wait_body:
+    raise SystemExit("wait_for_webview_server must fall back to full origin verification before failing")
 if 'CODEX_LINUX_INSTANCE_ID="port-$CODEX_LINUX_WEBVIEW_PORT"' not in multi_body:
     raise SystemExit("multi-launch must derive a stable instance id from the allocated port")
 if 'CODEX_LINUX_MULTI_LAUNCH=1' not in multi_body:
@@ -2380,6 +2385,8 @@ if 'send_warm_start_launch_action "${LAUNCHER_ARGS[@]}"' not in source:
     raise SystemExit("warm-start handoff must not receive launcher-only multi-launch flags")
 if 'launch_electron "${LAUNCHER_ARGS[@]}"' not in source:
     raise SystemExit("Electron launch must receive sanitized launcher args")
+if 'Adopted concurrently-started verified webview server' not in source:
+    raise SystemExit("launcher must tolerate a concurrent verified webview server winning the bind race")
 if 'RUNNING_APP_PID="$(find_running_app_pid)"' not in detect_body:
     raise SystemExit("detect_warm_start must record a pid-file running app even when warm start is disabled")
 if '[ -S "$LAUNCH_ACTION_SOCKET" ] && RUNNING_APP_PID="$(discover_running_app_pid)"' not in detect_body:
@@ -2595,8 +2602,9 @@ PY
     assert_contains "$REPO_DIR/launcher/start.sh.template" '/dev/tcp/127.0.0.1/"$CODEX_LINUX_WEBVIEW_PORT"'
     assert_contains "$REPO_DIR/launcher/start.sh.template" "kill -9 \"\$probe_pid\""
     assert_contains "$REPO_DIR/launcher/start.sh.template" 'curl --disable --noproxy 127.0.0.1,localhost --silent --show-error --fail --max-time 2'
-    assert_contains "$REPO_DIR/launcher/start.sh.template" "for attempt in \$(seq 1 250)"
-    assert_contains "$REPO_DIR/launcher/start.sh.template" "sleep 0.02"
+    assert_contains "$REPO_DIR/launcher/start.sh.template" "webview_origin_is_reachable_fast"
+    assert_contains "$REPO_DIR/launcher/start.sh.template" "for attempt in \$(seq 1 20)"
+    assert_contains "$REPO_DIR/launcher/start.sh.template" "sleep 0.05"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "Webview origin verified."
     assert_contains "$REPO_DIR/launcher/start.sh.template" "hydrate_graphical_session_env"
     assert_not_contains "$REPO_DIR/install.sh" "pkill -f \"http.server 5175\""
