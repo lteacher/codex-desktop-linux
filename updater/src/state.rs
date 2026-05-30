@@ -114,6 +114,9 @@ pub struct PersistedState {
     /// update.
     #[serde(default)]
     pub wrapper_changelog: Option<String>,
+    /// Progress of an in-flight wrapper apply: `applying` | `installed` | `failed`.
+    #[serde(default)]
+    pub wrapper_status: Option<String>,
 }
 
 impl PersistedState {
@@ -147,6 +150,7 @@ impl PersistedState {
             candidate_wrapper_version: None,
             candidate_wrapper_commit: None,
             wrapper_changelog: None,
+            wrapper_status: None,
         }
     }
 

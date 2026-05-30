@@ -187,16 +187,43 @@ fn coerce_setting_bool(value: &serde_json::Value) -> Option<bool> {
     }
 }
 
-/// Reads the user's auto-install-on-exit preference from the app
-/// `settings.json`. Returns `Some(true|false)` only when the toggle key is
-/// present and coercible; any missing file, parse error, or absent key yields
-/// `None` so the caller falls back to the config/default value. Never panics.
-pub fn settings_auto_install_override() -> Option<bool> {
+const WRAPPER_UPDATES_SETTING_KEY: &str = "codex-linux-wrapper-updates-enabled";
+const WRAPPER_UPDATES_ENV_KEY: &str = "CODEX_LINUX_ENABLE_WRAPPER_UPDATES";
+
+/// Reads a boolean Linux setting from the app `settings.json`. Returns
+/// `Some(true|false)` only when `key` is present and coercible; any missing
+/// file, parse error, non-object, or absent key yields `None` so the caller
+/// falls back to the config/default value. Never panics.
+fn settings_bool_override(key: &str) -> Option<bool> {
     let path = app_settings_path()?;
     let content = fs::read_to_string(&path).ok()?;
     let parsed = serde_json::from_str::<serde_json::Value>(&content).ok()?;
     let object = parsed.as_object()?;
-    coerce_setting_bool(object.get(AUTO_INSTALL_SETTING_KEY)?)
+    coerce_setting_bool(object.get(key)?)
+}
+
+/// Reads the user's auto-install-on-exit preference from the app
+/// `settings.json` (the "Install updates when you close Codex" toggle).
+pub fn settings_auto_install_override() -> Option<bool> {
+    settings_bool_override(AUTO_INSTALL_SETTING_KEY)
+}
+
+/// Reads the user's wrapper-update tracking preference from the app
+/// `settings.json`.
+pub fn settings_wrapper_updates_override() -> Option<bool> {
+    settings_bool_override(WRAPPER_UPDATES_SETTING_KEY)
+}
+
+/// Reads the launcher/feature env override for wrapper update tracking. This
+/// lets an opt-in Linux feature enable the wrapper axis for launcher-spawned
+/// updater commands while keeping the persisted default disabled.
+pub fn env_wrapper_updates_override() -> Option<bool> {
+    let value = std::env::var(WRAPPER_UPDATES_ENV_KEY).ok()?;
+    let normalized = value.trim().to_ascii_lowercase();
+    Some(!matches!(
+        normalized.as_str(),
+        "" | "0" | "false" | "no" | "off"
+    ))
 }
 
 #[cfg(test)]
@@ -260,6 +287,20 @@ mod tests {
         assert_eq!(override_with_settings(Some("not json{")), None);
         assert_eq!(override_with_settings(Some("[1,2,3]")), None);
         assert_eq!(override_with_settings(Some(r#"{"other-key": true}"#)), None);
+    }
+
+    #[test]
+    fn wrapper_updates_env_override_is_coerced() {
+        let _guard = crate::test_util::env_lock();
+
+        std::env::set_var("CODEX_LINUX_ENABLE_WRAPPER_UPDATES", "1");
+        assert_eq!(env_wrapper_updates_override(), Some(true));
+
+        std::env::set_var("CODEX_LINUX_ENABLE_WRAPPER_UPDATES", "off");
+        assert_eq!(env_wrapper_updates_override(), Some(false));
+
+        std::env::remove_var("CODEX_LINUX_ENABLE_WRAPPER_UPDATES");
+        assert_eq!(env_wrapper_updates_override(), None);
     }
 
     #[test]

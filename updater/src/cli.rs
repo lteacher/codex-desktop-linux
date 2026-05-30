@@ -25,6 +25,9 @@ pub enum Commands {
         #[arg(long, default_value_t = false)]
         json: bool,
     },
+    /// Rebuild and install the pending wrapper (repo) update for this install
+    /// type. Invoked by the launcher when it consumes the wrapper-update marker.
+    ApplyWrapperUpdate,
     CliPreflight {
         #[arg(long)]
         cli_path: Option<PathBuf>,

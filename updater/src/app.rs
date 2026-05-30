@@ -7,7 +7,7 @@ use crate::{
     config::{RuntimeConfig, RuntimePaths},
     install, install_rollback, liveness, logging, notify, rollback,
     state::{CliStatus, PersistedState, UpdateStatus},
-    upstream, wrapper,
+    upstream, wrapper, wrapper_apply,
 };
 use anyhow::{Context, Result};
 use chrono::{Duration as ChronoDuration, Utc};
@@ -36,7 +36,12 @@ pub async fn run(cli: Cli) -> Result<()> {
     paths.ensure_dirs()?;
     logging::init(&paths.log_file)?;
 
-    let config = RuntimeConfig::load_or_default(&paths)?;
+    let mut config = RuntimeConfig::load_or_default(&paths)?;
+    if let Some(enabled) = crate::config::settings_wrapper_updates_override()
+        .or_else(crate::config::env_wrapper_updates_override)
+    {
+        config.enable_wrapper_updates = enabled;
+    }
     let mut state =
         PersistedState::load_or_default(&paths.state_file, effective_auto_install(&config))?;
     let original_state = state.clone();
@@ -49,6 +54,9 @@ pub async fn run(cli: Cli) -> Result<()> {
             run_check_now(&config, &mut state, &paths, if_stale).await
         }
         Commands::CheckWrapper { json } => run_check_wrapper(&config, &mut state, &paths, json),
+        Commands::ApplyWrapperUpdate => {
+            wrapper_apply::run_apply_wrapper_update(&config, &mut state, &paths).await
+        }
         Commands::CliPreflight {
             cli_path,
             print_path,

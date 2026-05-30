@@ -72,7 +72,8 @@ pub struct BuildArtifacts {
     pub package_path: PathBuf,
 }
 
-/// Rebuilds a Linux package from the downloaded upstream DMG.
+/// Rebuilds a Linux package from the downloaded upstream DMG, using the
+/// configured `builder_bundle_root` as the wrapper source.
 pub async fn build_update(
     config: &RuntimeConfig,
     state: &mut PersistedState,
@@ -80,14 +81,38 @@ pub async fn build_update(
     candidate_version: &str,
     dmg_path: &Path,
 ) -> Result<BuildArtifacts> {
+    build_update_from(
+        &config.builder_bundle_root,
+        config,
+        state,
+        paths,
+        candidate_version,
+        dmg_path,
+    )
+    .await
+}
+
+/// Rebuilds a Linux package from the downloaded upstream DMG, copying the
+/// wrapper bundle from `bundle_source` (the configured builder bundle for DMG
+/// updates, or a freshly-fetched wrapper checkout for wrapper updates). The
+/// managed Node runtime is sourced from `config.builder_bundle_root` when
+/// present, falling back to `bundle_source`.
+pub async fn build_update_from(
+    bundle_source: &Path,
+    config: &RuntimeConfig,
+    state: &mut PersistedState,
+    paths: &RuntimePaths,
+    candidate_version: &str,
+    dmg_path: &Path,
+) -> Result<BuildArtifacts> {
     let workspace = BuilderWorkspace::prepare(&config.workspace_root, candidate_version)?;
-    let build_path = build_command_path(&config.builder_bundle_root);
+    let build_path = build_command_path(bundle_source);
 
     state.status = UpdateStatus::PreparingWorkspace;
     state.artifact_paths.workspace_dir = Some(workspace.workspace_dir.clone());
     state.save(&paths.state_file)?;
 
-    copy_builder_bundle(&config.builder_bundle_root, &workspace.bundle_dir)?;
+    copy_builder_bundle(bundle_source, &workspace.bundle_dir)?;
 
     state.status = UpdateStatus::PatchingApp;
     state.save(&paths.state_file)?;

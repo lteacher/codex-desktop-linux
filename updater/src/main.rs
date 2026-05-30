@@ -18,6 +18,7 @@ mod state;
 mod test_util;
 mod upstream;
 mod wrapper;
+mod wrapper_apply;
 
 use anyhow::Result;
 use clap::Parser;

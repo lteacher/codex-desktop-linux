@@ -31,6 +31,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   version, and falls back to git commit subjects. Packaged frozen bundles
   without a git checkout degrade gracefully (no wrapper tracking; updates arrive
   via a normal package upgrade).
+- New opt-in Linux feature `codex-wrapper-updater` adds a separate in-app
+  wrapper Update button. When enabled in `linux-features/features.json`, it
+  stages the wrapper-update environment flag, shows only when
+  `codex-update-manager` has recorded a newer wrapper candidate, writes an
+  app-id-scoped pending marker, and lets the launcher apply the wrapper update
+  before the next cold start.
 - Launcher rendering mode `CODEX_LINUX_RENDERING_MODE=wayland-gpu`, which
   forces native Wayland with GPU compositing enabled and skips forced renderer
   accessibility by default for Wayland desktops where XWayland or software

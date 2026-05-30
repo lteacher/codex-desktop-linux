@@ -1,0 +1,16 @@
+{
+  "id": "codex-wrapper-updater",
+  "name": "Wrapper update button",
+  "description": "Adds a separate top-right Update button that appears when a newer Codex Desktop Linux wrapper build (this project's own Linux features and fixes) is available. One click rebuilds and restarts. Distinct from the upstream Codex app updater.",
+  "entrypoints": {
+    "patches": "./patch.js",
+    "stageHook": "./stage.sh"
+  },
+  "runtimeHooks": {
+    "env": {
+      "source": "wrapper-updater.env",
+      "name": "wrapper-updater.env",
+      "mode": "0644"
+    }
+  }
+}

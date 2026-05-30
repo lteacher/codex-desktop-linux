@@ -29,8 +29,11 @@ APP_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/$CODEX_LINUX_APP_ID"
 APP_SETTINGS_FILE="$APP_CONFIG_DIR/settings.json"
 CODEX_LINUX_SETTINGS_FILE="$APP_SETTINGS_FILE"
 CODEX_LINUX_FEATURES_DIR="$SCRIPT_DIR/.codex-linux/features"
-export CODEX_HOME CODEX_LINUX_APP_ID CODEX_LINUX_APP_DISPLAY_NAME CODEX_LINUX_WEBVIEW_PORT CODEX_LINUX_SETTINGS_FILE CODEX_LINUX_FEATURES_DIR
+CODEX_LINUX_APP_DIR="$SCRIPT_DIR"
+CODEX_LINUX_LAUNCHER_CMD="${CODEX_LINUX_LAUNCHER_CMD:-$0}"
+export CODEX_HOME CODEX_LINUX_APP_ID CODEX_LINUX_APP_DISPLAY_NAME CODEX_LINUX_WEBVIEW_PORT CODEX_LINUX_SETTINGS_FILE CODEX_LINUX_FEATURES_DIR CODEX_LINUX_APP_DIR CODEX_LINUX_LAUNCHER_CMD
 APP_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/$CODEX_LINUX_APP_ID"
+APP_BASE_STATE_DIR="$APP_STATE_DIR"
 APP_PID_FILE="$APP_STATE_DIR/app.pid"
 WEBVIEW_PID_FILE="$APP_STATE_DIR/webview.pid"
 LAUNCH_ACTION_RUNTIME_DIR="${XDG_RUNTIME_DIR:-$APP_STATE_DIR}/$CODEX_LINUX_APP_ID"
@@ -1303,8 +1306,9 @@ resolve_update_manager_path() {
     for candidate in \
         "$SCRIPT_DIR/../target/release/codex-update-manager" \
         "$SCRIPT_DIR/codex-update-manager" \
-        "/usr/bin/codex-update-manager" \
-        "/usr/local/bin/codex-update-manager"
+        "${HOME:-}/.local/bin/codex-update-manager" \
+        "/usr/local/bin/codex-update-manager" \
+        "/usr/bin/codex-update-manager"
     do
         if [ -x "$candidate" ]; then
             CODEX_UPDATE_MANAGER_PATH="$(canonical_path "$candidate")"
@@ -1329,6 +1333,44 @@ has_update_manager() {
 run_update_manager() {
     resolve_update_manager_path || return 127
     "$CODEX_UPDATE_MANAGER_PATH" "$@"
+}
+
+# Consume the wrapper-update marker written by the in-app wrapper Update button
+# and apply the pending wrapper (repo) update before the app starts. On success,
+# re-exec the launcher so the user lands in the freshly installed build. On
+# failure the marker is left in place to retry next launch, and startup
+# continues with the current build. Skipped when the app is already running.
+apply_pending_wrapper_update() {
+    local marker="$APP_BASE_STATE_DIR/wrapper-update-pending"
+    [ -f "$marker" ] || return 0
+
+    # Never rebuild while another instance is live.
+    if find_running_app_pid >/dev/null 2>&1; then
+        echo "Codex Desktop is running; deferring wrapper update."
+        return 0
+    fi
+
+    if ! has_update_manager; then
+        echo "codex-update-manager not found; leaving wrapper update marker for later."
+        return 0
+    fi
+
+    echo "Applying pending Codex Desktop Linux wrapper update..."
+    log_phase "wrapper_update_apply_start"
+    if run_update_manager apply-wrapper-update; then
+        rm -f "$marker"
+        log_phase "wrapper_update_apply_done"
+        # The launcher itself may have been replaced by the rebuild; re-exec into
+        # the new build. Guard against loops: only re-exec after the marker was
+        # successfully removed (so a re-entry finds no marker and falls through).
+        echo "Wrapper update applied; restarting launcher."
+        exec "$CODEX_LINUX_LAUNCHER_CMD" "$@"
+    fi
+
+    echo "Wrapper update apply failed; continuing with the current build (marker kept for retry)."
+    log_phase "wrapper_update_apply_failed"
+    notify_error "The Codex Desktop Linux update could not be applied. It will be retried next launch. Check the updater log for details."
+    return 0
 }
 
 pid_is_current_user() {
@@ -2233,6 +2275,7 @@ prepend_managed_node_runtime_to_path
 source_feature_env_files
 register_url_scheme_handlers
 reconcile_runtime_state
+apply_pending_wrapper_update "$@"
 detect_warm_start
 trap cleanup_launcher EXIT
 
@@ -2318,5 +2361,9 @@ resolve_browser_use_runtime_env
 
 echo "Using CODEX_CLI_PATH=${CODEX_CLI_PATH:-warm-start-skip}"
 echo "Using managed Node.js runtime=${CODEX_MANAGED_NODE_RUNTIME_DIR:-$SCRIPT_DIR/resources/node-runtime}"
+
+if resolve_update_manager_path >/dev/null 2>&1; then
+    export CODEX_UPDATE_MANAGER_PATH
+fi
 
 launch_electron "${LAUNCHER_ARGS[@]}"
