@@ -2096,6 +2096,26 @@ test("adds Linux package updater to current bootstrap updater wiring after callb
   assert.match(patched, /send:e=>M\.sendMessageToAllRegisteredWindows\(e\)/);
 });
 
+test("adds Linux package updater to current bootstrap updater wiring when dispatcher is farther away", () => {
+  const source = [
+    "let n=require(`electron`),i=require(`node:path`),o=require(`node:fs`),u=require(`node:child_process`);",
+    "c({onUpdateReadyChanged:e=>{a.sendMessageToAllRegisteredWindows({type:`app-update-ready-changed`,isUpdateReady:e})}});",
+    "var rK={enabled:!1,running:!1,state:`disabled`};",
+    "async function iK(){",
+    "let{startedAtMs:r,buildFlavor:a,desktopSentry:o,sparkleManager:s,setSparkleBridgeHandlers:c,setSecondInstanceArgsHandler:l}=t.x(),d=t.T.shouldIncludeSparkle(a,process.platform,process.env);",
+    "let M=oG({});let ee=pB(),te=()=>{ee.allowQuitTemporarilyForUpdateInstall(),n.app.quit()};",
+    "c({onInstallProgressChanged:e=>{E&&M.sendMessageToAllRegisteredWindows({type:`app-update-install-progress-changed`,installProgressPercent:e})},onUpdateReadyChanged:e=>{M.sendMessageToAllRegisteredWindows({type:`app-update-ready-changed`,isUpdateReady:e})},onUpdateLifecycleStateChanged:e=>{M.sendMessageToAllRegisteredWindows({type:`app-update-lifecycle-state-changed`,lifecycleState:e})},",
+    "let codexLinuxPadding=`" + "x".repeat(2000) + "`;",
+    "onInstallUpdatesRequested:()=>{te()},isTrustedIpcEvent:N});",
+    "}",
+  ].join("");
+
+  const patched = applyPatchTwice(applyLinuxAppUpdaterBridgePatch, source);
+
+  assert.match(patched, /function codexLinuxCreatePackageUpdateManager\(/);
+  assert.match(patched, /send:e=>M\.sendMessageToAllRegisteredWindows\(e\)/);
+});
+
 test("migrates already-patched bootstrap updater bridge to probe before enabling UI", () => {
   const patched = applyLinuxAppUpdaterBridgePatch(currentBootstrapUpdaterBundleFixture());
   const oldPatched = patched
@@ -3567,6 +3587,28 @@ test("persistent rate limit footer skips composer patch when helper cannot be in
 
   assert.equal(patched, source);
   assert.doesNotMatch(patched, /codexLinuxRateLimitFooter/);
+});
+
+test("persistent rate limit footer adapts to current composer permissions footer shape", () => {
+  const source = [
+    "var $=qt();var Q=Hr();",
+    "function Xv({activeCollaborationMode:t}){let Te=t?.settings.model??null,{data:De}=Y(de),Ie=_a(De),ze=da(De),Be=ma(Ie,{activeLimitName:ze,selectedModel:Te}),Ue=ya(Ie,{activeLimitName:ze,selectedModel:Te});return Be??Ue}",
+    "function Sm(e){return e}",
+    "function Lm(e){let t=(0,$.c)(34),{composerMode:d,conversationId:f,hasGoal:y,isGoalActionAvailable:b,onClearGoal:x,permissionsHostId:C,permissionsCwdOverride:w,showPermissions:T}=e,E=T===void 0?!0:T,k=(0,Q.jsx)(Co,{conversationId:f}),A;t[22]!==d||t[23]!==f||t[24]!==y||t[25]!==b||t[26]!==x||t[27]!==w||t[28]!==C||t[29]!==E?(A=d===`cloud`?null:(0,Q.jsx)(Q.Fragment,{children:E?(0,Q.jsxs)(Q.Fragment,{children:[(0,Q.jsx)(Sm,{conversationId:f,hostId:C,cwdOverride:w}),(0,Q.jsx)(Rm,{conversationId:f,hasGoal:y,isGoalActionAvailable:b,onClearGoal:x,showDivider:!0})]}):null}),t[22]=d,t[23]=f,t[24]=y,t[25]=b,t[26]=x,t[27]=w,t[28]=C,t[29]=E,t[30]=A):A=t[30];let j;return t[31]!==k||t[32]!==A?(j=(0,Q.jsxs)(`div`,{className:`flex min-w-0 items-center gap-[5px]`,children:[k,A]}),t[31]=k,t[32]=A,t[33]=j):j=t[33],j}",
+    "function Rm(e){let t=(0,$.c)(16),{conversationId:n,hasGoal:r,isGoalActionAvailable:i,onClearGoal:a,showDivider:o}=e,{activeMode:s,modes:c,setSelectedMode:l}=cr(n);return l}",
+  ].join("");
+
+  const patched = applyPatchTwice(applyPersistentRateLimitFooterPatch, source);
+
+  assert.match(patched, /function codexLinuxRateLimitFooter\(\{conversationId:e\}\)/);
+  assert.match(
+    patched,
+    /\{data:n\}=Y\(de\),r=_a\(n\),i=da\(n\),a=ya\(r,\{activeLimitName:i,selectedModel:t\}\)/,
+  );
+  assert.match(
+    patched,
+    /\(0,Q\.jsx\)\(Sm,\{conversationId:f,hostId:C,cwdOverride:w\}\),f==null\?null:\(0,Q\.jsx\)\(codexLinuxRateLimitFooter,\{conversationId:f\}\),\(0,Q\.jsx\)\(Rm,\{conversationId:f,hasGoal:y,isGoalActionAvailable:b,onClearGoal:x,showDivider:!0\}\)/,
+  );
 });
 
 test("patcher CLI writes --report-json output", () => {

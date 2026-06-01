@@ -205,6 +205,13 @@ function applyLinuxRemoteControlClientAccountCompatibilityPatch(source) {
   ) {
     return source;
   }
+  if (
+    source.includes("function tp({authIdentity:e,connectionKey:t,deviceKeyClient:n,globalState:r}){let i=(await Promise.all(np(e).map(async e=>{let i=Mf(t,e);return{key:i,record:await ip({deviceKeyClient:n,enrollmentKey:i,globalState:r})}}))).find(e=>e.record!=null);return i?.record==null?null:{key:i.key,record:i.record}}") &&
+    source.includes("function np(e){if(e.tokenAccountUserId==null)return[];let t=[e.tokenAccountUserId];return e.tokenAccountId!=null&&e.headerChatGptAccountId===e.tokenAccountId&&e.tokenAuthUserId!=null&&e.tokenAuthUserId!==e.tokenAccountUserId&&t.push(e.tokenAuthUserId),t}") &&
+    source.includes("u?.key??Mf(r,c)")
+  ) {
+    return source;
+  }
 
   // 26.527.x ships the multi-account enrollment compatibility natively (the
   // helpers were renamed, e.g. ep->wh / tp->Th). Detect both the candidate-id
@@ -238,9 +245,10 @@ function applyLinuxRemoteControlClientAccountCompatibilityPatch(source) {
   const enrollmentKeyFn = helpersMatch[1];
 
   const enrollmentStartRegex = new RegExp(
-    `let ([A-Za-z_$][\\w$]*)=([A-Za-z_$][\\w$]*)\\(([A-Za-z_$][\\w$]*)\\),([A-Za-z_$][\\w$]*)=\\1\\.tokenAccountUserId;` +
+    `let ([A-Za-z_$][\\w$]*)=([A-Za-z_$][\\w$]*)\\(([A-Za-z_$][\\w$]*)\\),[\\s\\S]{0,240}?` +
+      `([A-Za-z_$][\\w$]*)=\\1\\.tokenAccountUserId(?:\\?\\?null)?(?:,[^;]{0,160})?;` +
       `if\\(\\4==null\\)throw Error\\(\`Remote control enrollment requires the current ChatGPT account user id\\.\`\\);` +
-      `let ([A-Za-z_$][\\w$]*)=${enrollmentKeyFn}\\(([A-Za-z_$][\\w$]*),\\4\\),` +
+      `[\\s\\S]{0,240}?let ([A-Za-z_$][\\w$]*)=${enrollmentKeyFn}\\(([A-Za-z_$][\\w$]*),\\4\\),[\\s\\S]{0,120}?` +
       `([A-Za-z_$][\\w$]*)=await ([A-Za-z_$][\\w$]*)\\(\\{deviceKeyClient:([A-Za-z_$][\\w$]*),enrollmentKey:\\5,globalState:([A-Za-z_$][\\w$]*)\\}\\),` +
       `([A-Za-z_$][\\w$]*)=\\7,([A-Za-z_$][\\w$]*);`,
     "u",
