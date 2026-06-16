@@ -11,9 +11,11 @@ module.exports = {
   status: (result, warnings) => ({
     status: result?.changed
       ? "applied"
-      : result?.matched
-        ? "already-applied"
-        : "skipped-optional",
+      : warnings.length > 0
+        ? "skipped-optional"
+        : result?.matched
+          ? "already-applied"
+          : "skipped-optional",
     reason: result?.reason ?? warnings[0] ?? null,
   }),
 };

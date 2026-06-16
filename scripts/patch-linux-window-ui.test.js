@@ -1229,6 +1229,36 @@ test("projectless documents asset patch updates Vite build bundle", () => {
   }
 });
 
+test("projectless documents descriptor surfaces resolver drift as skipped optional", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codex-projectless-xdg-drift-"));
+  try {
+    const buildDir = path.join(tempRoot, ".vite", "build");
+    fs.mkdirSync(buildDir, { recursive: true });
+    fs.writeFileSync(path.join(buildDir, "main.js"), mainBundlePrefix, "utf8");
+    fs.writeFileSync(
+      path.join(buildDir, "src-test.js"),
+      "function Mb({homeDirectory:e,path:t}){return t.resolve(e,`Documents`,`Codex`)}async function Lb(){throw Error(`Projectless thread directory must be a real directory`)}",
+      "utf8",
+    );
+
+    const report = createPatchReport();
+    captureWarns(() => patchExtractedApp(tempRoot, { report }));
+
+    const patch = report.patches.find((patch) =>
+      patch.name === "linux-projectless-xdg-documents-dir",
+    );
+    assert.equal(patch.status, "skipped-optional");
+    assert.match(patch.reason, /projectless documents directory resolver/);
+    assert.ok(
+      patch.warnings.some((warning) =>
+        warning.includes("projectless documents directory resolver"),
+      ),
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("preserves user-enabled remote_control config on Linux", () => {
   const source = [
     "async function mV({codexHome:e,hostConfig:n,logger:r=t.Jr()}){if(n.kind===`local`)try{await hV(i.default.join(e??t.Rr({hostConfig:n,preferWsl:t.Kr(n)}),pV))&&r.info(`Removed remote_control from config before app-server start`)}catch(e){r.warning(`Failed to remove remote_control before app-server start`,{safe:{},sensitive:{error:e}})}}",
